@@ -1,0 +1,16 @@
+{
+	"build_systems":
+	[
+		{
+			"file_regex": "/([^/:]+):(\\d+):(\\d+): ",
+			"name": "cmake",
+			"shell_cmd": "mkdir -p ${project_path:${folder}}/build; cmake -B${project_path:${folder}}/build -H${project_path:${folder}}; make -C ${project_path:${folder}}/build"
+		}
+	],
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	]
+}
