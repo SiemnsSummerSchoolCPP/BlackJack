@@ -79,3 +79,17 @@ std::ostream& PlayingCards::operator << (std::ostream& o, const Card& target)
 {
 	return o << target.suitStr() << target.rankStr();
 }
+
+/*
+** Limits.
+*/
+
+Card::Rank std::numeric_limits<Card::Rank>::min()
+{
+	return Card::Rank::kTwo;
+}
+
+Card::Rank std::numeric_limits<Card::Rank>::max()
+{
+	return Card::Rank::kAce;
+}
