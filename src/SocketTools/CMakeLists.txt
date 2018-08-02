@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
-project(Networking)
+project(SocketTools)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -10,10 +10,7 @@ file(GLOB includes
 add_library(${PROJECT_NAME} STATIC ${srcs} ${includes})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
-	${CMAKE_SOURCE_DIR}/includes/${PROJECT_NAME}/
-	${CMAKE_SOURCE_DIR}/includes/)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE SocketTools)
+	${CMAKE_SOURCE_DIR}/includes/${PROJECT_NAME}/)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	ARCHIVE_OUTPUT_DIRECTORY	"${CMAKE_SOURCE_DIR}/bin"
@@ -23,9 +20,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 # Flags
-# String(CONCAT Flags ${Flags} " " "-Wall")
-# String(CONCAT Flags ${Flags} " " "-Wextra")
-# String(CONCAT Flags ${Flags} " " "-Werror")
-# String(CONCAT Flags ${Flags} " " "-Waddress")
-# String(CONCAT Flags ${Flags} " " "-Waggregate-return")
+String(CONCAT Flags ${Flags} " " "-Wall")
+String(CONCAT Flags ${Flags} " " "-Wextra")
+String(CONCAT Flags ${Flags} " " "-Werror")
+String(CONCAT Flags ${Flags} " " "-Waddress")
+String(CONCAT Flags ${Flags} " " "-Waggregate-return")
 Set(CMAKE_CXX_FLAGS "${Flags}")
