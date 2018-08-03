@@ -5,4 +5,6 @@
 struct UserModel
 {
 	std::string name;
+	double money;
+	bool isReady;
 };

@@ -26,6 +26,9 @@ namespace Networking
 		// User input parsering.
 		bool parseUserInputSendMsg(std::string userInput);
 		bool parseUserInputChangeName(std::string userInput);
+		bool parseUserInputSetToReady(std::string userInput);
+		
+		bool parseUserInputPlaceBet(std::string userInput);
 		
 		// Msg Sending.
 		void sendStr(std::string str);

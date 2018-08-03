@@ -14,6 +14,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_SOURCE_DIR}/includes/)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE SocketTools)
+target_link_libraries(${PROJECT_NAME} PRIVATE PlayingCards)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	ARCHIVE_OUTPUT_DIRECTORY	"${CMAKE_SOURCE_DIR}/bin"

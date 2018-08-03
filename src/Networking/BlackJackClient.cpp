@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include "SocketTools/Exceptions.h"
 #include <iostream>
+#include <sstream>
 #include <regex>
 
 using namespace Networking;
@@ -64,6 +65,8 @@ bool BlackJackClient::parseUserInput(const std::string userInput)
 {
 	if (parseUserInputSendMsg(userInput)) {}
 	else if (parseUserInputChangeName(userInput)) {}
+	else if (parseUserInputSetToReady(userInput)) {}
+	else if (parseUserInputPlaceBet(userInput)) {}
 	else
 	{
 		fprintf(stderr, "%s: Invalid command\n", userInput.c_str());
@@ -102,6 +105,58 @@ bool BlackJackClient::parseUserInputChangeName(const std::string userInput)
 		return false;
 	
 	sendStr(STR(MsgHeaders::kChangeNameRequest + regexMatch[1].str()));
+	return true;
+}
+
+bool BlackJackClient::parseUserInputSetToReady(std::string userInput)
+{
+	std::smatch regexMatch;
+	
+	const auto itMatches = std::regex_search(
+		userInput,
+		regexMatch,
+		std::regex("^(I am ready|ready|[Ss]tart the game)$"));
+	
+	if (!itMatches)
+		return false;
+	
+	sendStr(STR(MsgHeaders::kSetUserAsReadyRequest));
+	return true;
+}
+
+bool BlackJackClient::parseUserInputPlaceBet(std::string userInput)
+{
+	static const char* const regexDouble =
+		"(?:0|(?:[1-9][0-9]*))(?:\\.[0-9]+)?";
+
+	std::smatch regexMatch;
+	double amount;
+	int handIndex = 0;
+	
+	const auto itMatches = std::regex_search(
+		userInput,
+		regexMatch,
+		std::regex(STR("^bet (" + regexDouble + ")(?:\\$)?$")));
+	
+	if (!itMatches)
+	{
+		const auto itMatches = std::regex_search(
+			userInput,
+			regexMatch,
+			std::regex(STR("^bet (" + regexDouble + ")(?:\\$)? on ([0-9])$")));
+		
+		if (!itMatches)
+			return false;
+		
+		handIndex = std::stoi(regexMatch[2]);
+	}
+	
+	amount = std::stod(regexMatch[1]);
+	
+	auto ssBuf = std::stringstream();
+	ssBuf << MsgHeaders::kBetRequest << amount << " " << handIndex;
+	
+	sendStr(ssBuf.str());
 	return true;
 }
 
