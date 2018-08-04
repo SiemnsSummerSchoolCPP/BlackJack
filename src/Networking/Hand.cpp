@@ -9,16 +9,18 @@ std::ostream& Networking::operator << (std::ostream& o, const Hand& target)
 	{
 		o << card << " ";
 	}
+	
 	const auto points = GameManager::computeHandPoints(target);
 	o << "[";
 	
-	if (points == GameManager::blackjackPoints)
+	if (GameManager::isBlackjack(target))
 		o << "Blackjack";
-	else if (points > GameManager::blackjackPoints)
-		o << "BUSTED";
 	else
-		o << points << " points";
-	
+	{
+		if (GameManager::isBusted(points))
+			o << "BUSTED: ";
+		o << points << "p";
+	}
 	o << "]";
 	return o;
 }

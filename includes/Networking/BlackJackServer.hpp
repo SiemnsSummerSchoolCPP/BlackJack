@@ -46,6 +46,7 @@ namespace Networking
 		void startGame();
 		void startBettingPhase();
 		void startHitStandPhase();
+		void startCashingPhase();
 		
 		// Helpers.
 		std::string getNameOfNewUser(int socket);

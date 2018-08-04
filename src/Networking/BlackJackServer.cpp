@@ -163,6 +163,9 @@ void BlackJackServer::onNewMsg(
 		case MsgHeaders::kHitRequest:
 			userRequestsToHit(socket, msgStr);
 			break;
+		case MsgHeaders::kStandRequest:
+			userRequestsToStand(socket, msgStr);
+			break;
 		default:
 			invalidUserRequest(socket, bytes[0]);
 			break;
@@ -383,7 +386,7 @@ int BlackJackServer::userRequestsToMakeABet(
 	sendMsg(socket, SS(
 		"You have successfully placed your bet: "
 			<< std::setprecision(2) << amount << "$\n" <<
-		"Balance: "
+		"- Balance: "
 			<< std::setprecision(2) << user.money << "$").str());
 	
 	auto successMsg = SS(
@@ -445,7 +448,7 @@ int BlackJackServer::userRequestsToHit(
 	{
 		ssException <<
 			"You can't hit anymore.\n"
-			"- Your hand is busted: " <<
+			"- Your hand is: " <<
 			m_gameManager->getPlayers()[socket]->getHands()[handIndex];
 	}
 	catch (const GameManager::InvalidHandIndexExecption&)
@@ -454,13 +457,11 @@ int BlackJackServer::userRequestsToHit(
 	}
 	catch (const GameManager::HandIsAlreadyStandingExeption&)
 	{
-		ssException << "Hand " << handIndex << " is already standing.";
-	}
-	catch (const GameManager::PlayerHasBlackjackExeption&)
-	{
-		ssException
-			<< "You can't hit. You already have Blackjack: "
-			<< m_gameManager->getPlayers()[socket]->getHands()[handIndex];
+		if (m_gameManager->getPlayers()[socket]->getHands().size() == 1)
+			ssException << "Your hand";
+		else
+			ssException << "Hand " << handIndex;
+		ssException << " is already standing.";
 	}
 	
 	if (ssException.str().length() != 0)
@@ -478,15 +479,20 @@ int BlackJackServer::userRequestsToHit(
 
 	const auto& hand = player.getHands()[handIndex];
 	const auto handPoints = GameManager::computeHandPoints(hand);
-	if (handPoints > GameManager::blackjackPoints)
+	if (GameManager::isBusted(handPoints))
 	{
 		ssMsg << "- Busted." << std::endl;
 	}
-	else if (handPoints == GameManager::blackjackPoints)
+	else if (GameManager::isBlackjack(hand))
 	{
 		ssMsg << "- BlackJack!!!" << std::endl;
 	}
 	broadcastMsg(ssMsg.str());
+	
+	if (m_gameManager->allTheHandsAreStanding())
+	{
+		startCashingPhase();
+	}
 	
 	return 0;
 }
@@ -516,7 +522,45 @@ int BlackJackServer::userRequestsToStand(
 	std::stringstream(msgStr) >> handIndex;
 	
 	auto ssException = std::stringstream();
-	throw;
+	try
+	{
+		m_gameManager->executeStand(socket, handIndex);
+	}
+	catch (const GameManager::NotAPlayerExecption&)
+	{
+		ssException <<
+			"Sorry, but you're not participating in this game.\n"
+			"- Please wait until the game ends.";
+	}
+	catch (const GameManager::InvalidHandIndexExecption&)
+	{
+		ssException << "You don't own such a hand.";
+	}
+	catch (const GameManager::HandIsAlreadyStandingExeption&)
+	{
+		ssException << "Hand " << handIndex << " is already standing.";
+	}
+	
+	if (ssException.str().length() != 0)
+	{
+		sendMsg(socket, ssException.str());
+		return -1;
+	}
+	
+	const auto& player = *m_gameManager->getPlayers()[socket];
+	auto ssMsg = std::stringstream()
+		<< user.name << " Stands.\n"
+		<< "- His cards are: ";
+	player.printHands(ssMsg);
+	ssMsg << std::endl;
+	broadcastMsg(ssMsg.str());
+	
+	if (m_gameManager->allTheHandsAreStanding())
+	{
+		startCashingPhase();
+	}
+	
+	return 0;
 }
 
 /*
@@ -610,6 +654,86 @@ void BlackJackServer::startHitStandPhase()
 	
 	ssMsg << "Please type Hit (h), or Stand (s)" << std::endl;
 	broadcastMsg(ssMsg.str());
+	
+	if (m_gameManager->allTheHandsAreStanding())
+	{
+		startCashingPhase();
+	}
+}
+
+void BlackJackServer::startCashingPhase()
+{
+	auto ssMsg = std::stringstream() << "\n"
+		<< "Everyone is 'Standing'\n";
+	
+	const auto cardsDealt = m_gameManager->dealCardsToDealer();
+	if (cardsDealt != 0)
+	{
+		ssMsg << "- Dealer gets " << cardsDealt << " more card(s).\n";
+	}
+	ssMsg << "- Dealer's hand: " << m_gameManager->getDealersHand() << "\n\n";
+	broadcastMsg(ssMsg.str());
+	
+	ssMsg.str(std::string());
+	ssMsg << "Cashing\n";
+	for (auto& socketAndPlayer : m_gameManager->getPlayers())
+	{
+		auto& player = *socketAndPlayer.second;
+		
+		ssMsg << "- " << m_users[socketAndPlayer.first].name << ": \n";
+		
+		double totalWin = 0;
+		double totalIncome = 0;
+		for (const auto& hand : player.getHands())
+		{
+			const auto betMultiplier =
+				m_gameManager->getWinMultiplierFromHand(hand);
+			
+			ssMsg << "- - ";
+			if (betMultiplier <= 0.01)
+			{
+				ssMsg << "Lost";
+			}
+			else
+			{
+				if (betMultiplier > GameManager::blackjackBetMultiplier - 0.01)
+				{
+					ssMsg << "Blackjack win";
+				}
+				else if (betMultiplier > 2 - 0.01)
+				{
+					ssMsg << "Win!";
+				}
+				else
+				{
+					ssMsg << "Draw";
+				}
+				
+				const auto winAmount = hand.bet.amount * betMultiplier;
+				totalWin += winAmount;
+				
+				ssMsg << ": +"
+					<< std::fixed << std::setprecision(2) << winAmount << "$";
+			}
+			
+			totalIncome += hand.bet.amount * (betMultiplier - 1);
+			ssMsg << ": " << hand << "\n";
+		}
+		
+		player.setMoney(player.getMoney() + totalWin);
+		sendMsg(socketAndPlayer.first, SS(
+			"Total income: " <<
+				std::fixed << std::setprecision(2) << totalIncome << "$\n" <<
+			"- Money left: " <<
+				std::fixed << std::setprecision(2) << player.getMoney() << "$\n"
+		).str());
+	}
+	
+	ssMsg << "Thanks for the game. Type 'ready' if you want to play again.\n";
+	broadcastMsg(ssMsg.str());
+	
+	delete m_gameManager;
+	m_gameManager = nullptr;
 }
 
 /*

@@ -30,6 +30,7 @@ namespace Networking
 		
 		bool parseUserInputPlaceBet(std::string userInput);
 		bool parseUserInputHit(std::string userInput);
+		bool parseUserInputStand(std::string userInput);
 		
 		// Msg Sending.
 		void sendStr(std::string str);

@@ -19,13 +19,14 @@ namespace Networking
 		struct InvalidBetExecption : public std::exception {};
 		struct NotEnoughMoneyExeption : public std::exception {};
 		struct PlayerIsBustedExeption : public std::exception {};
-		struct PlayerHasBlackjackExeption : public std::exception {};
 		struct HandIsAlreadyStandingExeption : public std::exception {};
 		
-		static const int blackjackPoints = 21;
+		constexpr static const double blackjackBetMultiplier = (1 + 3.0 / 2.0);
 		
 		static int getCardPoints(const PlayingCards::Card& card);
 		static int computeHandPoints(const Hand& hand);
+		static bool isBusted(int points);
+		static bool isBlackjack(const Hand& hand);
 		
 		GameManager(std::map<int, UserModel>& users);
 		
@@ -44,15 +45,22 @@ namespace Networking
 		int executeBet(int playerId, double amount, int handIndex);
 		void dealCardsToEveryone();
 		const PlayingCards::Card& executeHit(int playerId, int handIndex);
+		void executeStand(int playerId, int handIndex);
+		int dealCardsToDealer();
+		double getWinMultiplierFromHand(const PlayerHand& hand) const;
 		
 		// Game status.
 		bool everyonePlacedTheirFirstBet() const;
+		bool allTheHandsAreStanding() const;
 		bool playerCanHit(const Player& player) const;
 		
 		void addPlayer(int id, UserModel& userModel);
 		int removePlayer(int id);
 		
 	private:
+		static const int blackjackPoints = 21;
+		static const int dealerPointsLimit = 17;
+		
 		GameManager::State m_state;
 		Dealer m_dealer;
 		std::map<int, Player*> m_players;

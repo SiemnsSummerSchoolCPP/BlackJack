@@ -68,6 +68,7 @@ bool BlackJackClient::parseUserInput(const std::string userInput)
 	else if (parseUserInputSetToReady(userInput)) {}
 	else if (parseUserInputPlaceBet(userInput)) {}
 	else if (parseUserInputHit(userInput)) {}
+	else if (parseUserInputStand(userInput)) {}
 	else
 	{
 		fprintf(stderr, "%s: Invalid command\n", userInput.c_str());
@@ -176,7 +177,7 @@ bool BlackJackClient::parseUserInputHit(const std::string userInput)
 		const auto itMatches = std::regex_search(
 			userInput,
 			regexMatch,
-			std::regex(STR("^(?:[Hh]it|[Hh]) on ([0-9])$")));
+			std::regex(STR("^[Hh]it on ([0-9])$")));
 		
 		if (!itMatches)
 			return false;
@@ -186,6 +187,36 @@ bool BlackJackClient::parseUserInputHit(const std::string userInput)
 	
 	auto ssBuf = std::stringstream();
 	ssBuf << MsgHeaders::kHitRequest << handIndex;
+	
+	sendStr(ssBuf.str());
+	return true;
+}
+
+bool BlackJackClient::parseUserInputStand(const std::string userInput)
+{
+	std::smatch regexMatch;
+	int handIndex = 0;
+	
+	const auto itMatches = std::regex_search(
+		userInput,
+		regexMatch,
+		std::regex(STR("^([Ss]tand|[Ss])$")));
+	
+	if (!itMatches)
+	{
+		const auto itMatches = std::regex_search(
+			userInput,
+			regexMatch,
+			std::regex(STR("^[Ss]tand on ([0-9])$")));
+		
+		if (!itMatches)
+			return false;
+		
+		handIndex = std::stoi(regexMatch[1]);
+	}
+	
+	auto ssBuf = std::stringstream();
+	ssBuf << MsgHeaders::kStandRequest << handIndex;
 	
 	sendStr(ssBuf.str());
 	return true;

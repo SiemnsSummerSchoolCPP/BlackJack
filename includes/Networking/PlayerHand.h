@@ -9,7 +9,7 @@ namespace Networking
 	struct PlayerHand : public Hand
 	{
 		Bet bet;
-		bool stand = false;
+		bool standing = false;
 		
 		friend std::ostream& operator << (std::ostream& o, const PlayerHand& h);
 	};
