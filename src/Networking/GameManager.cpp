@@ -1,6 +1,56 @@
 #include "GameManager.hpp"
+#include <map>
 
 using namespace Networking;
+
+int GameManager::getCardPoints(const PlayingCards::Card& card)
+{
+	static const auto points = std::map<PlayingCards::Card::Rank, int>
+	{
+		{ PlayingCards::Card::Rank::kTwo,	2 },
+		{ PlayingCards::Card::Rank::kThree,	3 },
+		{ PlayingCards::Card::Rank::kFour,	4 },
+		{ PlayingCards::Card::Rank::kFive,	5 },
+		{ PlayingCards::Card::Rank::kSix,	6 },
+		{ PlayingCards::Card::Rank::kSeven,	7 },
+		{ PlayingCards::Card::Rank::kEight,	8 },
+		{ PlayingCards::Card::Rank::kNine,	9 },
+		{ PlayingCards::Card::Rank::kTen,	10 },
+		
+		{ PlayingCards::Card::Rank::kJack,	10 },
+		{ PlayingCards::Card::Rank::kQueen,	10 },
+		{ PlayingCards::Card::Rank::kKing,	10 },
+		
+		{ PlayingCards::Card::Rank::kAce,	11 },
+	};
+	
+	return points.at(card.getRank());
+}
+
+int GameManager::computeHandPoints(const Hand& hand)
+{
+	int points = 0;
+	
+	for (const auto& card : hand.cards)
+	{
+		points += getCardPoints(card);
+	}
+	
+	if (points > blackjackPoints)
+	{
+		for (const auto& card : hand.cards)
+		{
+			if (card.getRank() == PlayingCards::Card::Rank::kAce)
+			{
+				points -= 10;
+				if (points <= blackjackPoints)
+					break;
+			}
+		}
+	}
+	
+	return points;
+}
 
 GameManager::GameManager(std::map<int, UserModel>& users)
 {
@@ -45,6 +95,11 @@ std::map<int, Player*> GameManager::getPlayers()
 	return m_players;
 }
 
+const Hand& GameManager::getDealersHand() const
+{
+	return m_dealer.getHand();
+}
+
 /*
 ** Setters
 */
@@ -86,6 +141,75 @@ int GameManager::executeBet(
 	return 0;
 }
 
+void GameManager::dealCardsToEveryone()
+{
+	for (auto& idAndPlayer : m_players)
+	{
+		m_dealer.dealCardsToAHand(idAndPlayer.second->getHands()[0]);
+	}
+	m_dealer.dealCardsToAHand(m_dealer.getHand());
+}
+
+const PlayingCards::Card& GameManager::executeHit(
+	const int playerId,
+	const int handIndex)
+{
+	if (!userIdIsPlaying(playerId))
+		throw NotAPlayerExecption();
+	
+	auto& player = *m_players[playerId];
+	
+	if (!playerCanHit(player))
+		throw PlayerIsBustedExeption();
+
+	if (handIndex >= player.getHands().size())
+		throw InvalidHandIndexExecption();
+	
+	auto& hand = player.getHands()[handIndex];
+	if (hand.stand)
+		throw HandIsAlreadyStandingExeption();
+	
+	if (computeHandPoints(hand) == blackjackPoints)
+		throw PlayerHasBlackjackExeption();
+	
+	const auto& newCard = m_dealer.dealACard();
+	hand.cards.push_back(newCard);
+	if (computeHandPoints(hand) >= blackjackPoints)
+	{
+		hand.stand = true;
+	}
+	
+	return newCard;
+}
+
+/*
+** Game status
+*/
+
+bool GameManager::everyonePlacedTheirFirstBet() const
+{
+	for (const auto& idAndPlayer : m_players)
+	{
+		const auto hand = idAndPlayer.second->getHands()[0];
+		if (hand.bet.amount <= std::numeric_limits<double>::epsilon())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool GameManager::playerCanHit(const Player& player) const
+{
+	for (const auto& hand : player.getHands())
+	{
+		if (!hand.stand)
+			return true;
+	}
+	
+	return false;
+}
+
 /*
 ** Public methods
 */
@@ -114,5 +238,5 @@ int GameManager::removePlayer(const int id)
 
 Player* GameManager::createPlayer(UserModel& userModel) const
 {
-	return new Player(userModel.name, userModel.money);
+	return new Player(userModel.money);
 }

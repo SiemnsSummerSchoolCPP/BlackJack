@@ -2,8 +2,7 @@
 
 using namespace Networking;
 
-Player::Player(const std::string& name, double& money) :
-	m_name(name),
+Player::Player(double& money) :
 	m_money(money)
 {
 	const auto anEmptyHand = PlayerHand();
@@ -28,4 +27,13 @@ std::vector<PlayerHand>& Player::getHands()
 void Player::setMoney(const double newValue)
 {
 	m_money = newValue;
+}
+
+std::ostream& Player::printHands(std::ostream& o) const
+{
+	for (const auto& hand : m_hands)
+	{
+		o << "{" << hand << "} ";
+	}
+	return o;
 }

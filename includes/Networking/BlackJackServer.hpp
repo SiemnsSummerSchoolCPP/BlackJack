@@ -39,9 +39,13 @@ namespace Networking
 		void userRequestsChangeName(int socket, std::string newName);
 		void userRequestsSetReady(int socket);
 		int userRequestsToMakeABet(int socket, std::string msgStr);
+		int userRequestsToHit(int socket, std::string msgStr);
+		int userRequestsToStand(int socket, std::string msgStr);
 		
 		// Game.
 		void startGame();
+		void startBettingPhase();
+		void startHitStandPhase();
 		
 		// Helpers.
 		std::string getNameOfNewUser(int socket);

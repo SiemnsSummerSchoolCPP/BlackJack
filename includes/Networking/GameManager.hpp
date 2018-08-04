@@ -18,6 +18,14 @@ namespace Networking
 		struct AlreadyPlacedABetException : public std::exception {};
 		struct InvalidBetExecption : public std::exception {};
 		struct NotEnoughMoneyExeption : public std::exception {};
+		struct PlayerIsBustedExeption : public std::exception {};
+		struct PlayerHasBlackjackExeption : public std::exception {};
+		struct HandIsAlreadyStandingExeption : public std::exception {};
+		
+		static const int blackjackPoints = 21;
+		
+		static int getCardPoints(const PlayingCards::Card& card);
+		static int computeHandPoints(const Hand& hand);
 		
 		GameManager(std::map<int, UserModel>& users);
 		
@@ -26,14 +34,20 @@ namespace Networking
 		size_t getNbOfPlayers() const;
 		bool userIdIsPlaying(int id) const;
 		std::vector<int> getPlayersIds() const;
-		
 		std::map<int, Player*> getPlayers();
+		const Hand& getDealersHand() const;
 		
 		// Setters.
 		void setState(GameManager::State newState);
 		
 		// Game actions.
 		int executeBet(int playerId, double amount, int handIndex);
+		void dealCardsToEveryone();
+		const PlayingCards::Card& executeHit(int playerId, int handIndex);
+		
+		// Game status.
+		bool everyonePlacedTheirFirstBet() const;
+		bool playerCanHit(const Player& player) const;
 		
 		void addPlayer(int id, UserModel& userModel);
 		int removePlayer(int id);
@@ -52,21 +66,3 @@ namespace Networking
 		kHitStand
 	};
 }
-
-// Dealer - holds his hand and the deck.
-
-// Players: map<socket, Player>
-
-// Player:
-// - name&
-// - money&
-// - hands: vector<PlayerHand>
-
-// Hand:
-// - cards: vector
-
-// PlayerHand: Hand
-// - bet: Bet
-
-// Bet:
-// - amount: double

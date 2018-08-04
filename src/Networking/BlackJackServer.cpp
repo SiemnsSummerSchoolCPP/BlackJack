@@ -8,6 +8,7 @@
 #include <regex>
 #include <sstream>
 #include <algorithm>
+#include <iomanip>
 
 using namespace Networking;
 
@@ -107,14 +108,6 @@ void BlackJackServer::onClientDisconnected(const int socket)
 {
 	const auto userName = m_users[socket].name;
 	
-	if (aGameIsTakingPlace())
-	{
-		if (m_gameManager->userIdIsPlaying(socket))
-		{
-			m_gameManager->removePlayer(socket);
-		}
-	}
-	
 	// Server.
 	{
 		printf("[User disconnected] Socket = %d name = %s\n",
@@ -124,9 +117,25 @@ void BlackJackServer::onClientDisconnected(const int socket)
 	
 	// Broadcast to everyone.
 	{
-		broadcastMsg(STR("User " + userName + " has disconnected"), socket);
+		broadcastMsg(STR(userName + " has disconnected"), socket);
 	}
 	
+	if (aGameIsTakingPlace())
+	{
+		if (m_gameManager->userIdIsPlaying(socket))
+		{
+			m_gameManager->removePlayer(socket);
+			if (m_gameManager->getPlayers().size() == 0)
+			{
+				delete m_gameManager;
+				m_gameManager = nullptr;
+				printf("All players left the game. The game deleted.\n");
+				
+				broadcastMsg(
+					"All players have left. You can now join the game.");
+			}
+		}
+	}
 	m_users.erase(socket);
 }
 
@@ -150,6 +159,9 @@ void BlackJackServer::onNewMsg(
 			break;
 		case MsgHeaders::kBetRequest:
 			userRequestsToMakeABet(socket, msgStr);
+			break;
+		case MsgHeaders::kHitRequest:
+			userRequestsToHit(socket, msgStr);
 			break;
 		default:
 			invalidUserRequest(socket, bytes[0]);
@@ -220,14 +232,21 @@ void BlackJackServer::userRequestsChangeName(
 	// Everybody else
 	{
 		broadcastMsg(
-			STR("User " + oldName + " has just changed his name to " + newName),
+			STR(oldName + " has just changed his name to " + newName),
 			socket);
 	}
 }
 
-void BlackJackServer::userRequestsSetReady(int socket)
+void BlackJackServer::userRequestsSetReady(const int socket)
 {
 	auto& user = m_users[socket];
+	
+	if (aGameIsTakingPlace())
+	{
+		sendMsg(socket, STR("A game is already being played."));
+		return;
+	}
+	
 	if (user.isReady)
 	{
 		sendMsg(socket,
@@ -263,12 +282,12 @@ void BlackJackServer::userRequestsSetReady(int socket)
 	
 	// Everyone.
 	{
-		const auto msg = STR(
-			"Player " + user.name + " is now ready. " +
-			"Players: " +
-			std::to_string(nbOfReadyPlayers) + "/" +
-			std::to_string(totalNbOfPlayers) + ". " +
-			"Type 'ready' to start the game.");
+		const auto msg = SS(
+			"Player " << user.name << " is now ready. " <<
+			"Players: " <<
+			nbOfReadyPlayers << "/" <<
+			totalNbOfPlayers << ". " <<
+			"Type 'ready' to start the game.").str();
 		broadcastMsg(msg);
 	}
 	
@@ -301,8 +320,14 @@ int BlackJackServer::userRequestsToMakeABet(
 	if (!aGameIsTakingPlace())
 	{
 		sendMsg(socket,
-			"No game is currently taking place. "
+			"No game is currently being played, so you can't Bet. "
 			"Plase type 'ready' and wait for other people to be ready.");
+		return -1;
+	}
+	
+	if (m_gameManager->getState() != GameManager::State::kBet)
+	{
+		sendMsg(socket, "Sorry, but it's not the betting phase.");
 		return -1;
 	}
 	
@@ -326,21 +351,23 @@ int BlackJackServer::userRequestsToMakeABet(
 		const auto& hand =
 			m_gameManager->getPlayers()[socket]->getHands()[handIndex];
 		
-		execption =
-			"You have already placed a bet of " +
-			std::to_string(hand.bet.amount) + "$";
+		execption = SS(
+			"You have already placed a bet of " <<
+			std::setprecision(2) << hand.bet.amount << "$").str();
 	}
 	catch (const GameManager::InvalidBetExecption&)
 	{
-		execption = std::to_string(amount) + "$: invalid bet.";
+		execption = SS(
+			std::setprecision(2) << std::to_string(amount) <<
+			"$: invalid bet.").str();
 	}
 	catch (const GameManager::NotEnoughMoneyExeption&)
 	{
-		const auto currentBalance = std::to_string(m_users[socket].money);
-		execption =
-			"Sorry, but you don't have enough money.\n"
-			"\tCurrent balance: " + currentBalance + "$\n" +
-			"\tRequested bet: " + std::to_string(amount) + "$";
+		execption = SS(
+			"Sorry, but you don't have enough money.\n" <<
+			"- Current balance: " << std::setprecision(2)
+				<< m_users[socket].money << "$\n" <<
+			"- Requested bet: " << std::setprecision(2) << amount << "$").str();
 	}
 	
 	if (execption != "")
@@ -353,20 +380,143 @@ int BlackJackServer::userRequestsToMakeABet(
 	const auto& hand =
 		m_gameManager->getPlayers()[socket]->getHands()[handIndex];
 	
-	sendMsg(socket, STR(
-		"You have successfully placed your bet in amount of: " +
-			std::to_string(amount) + "$\n" +
-		"Balance: " + std::to_string(user.money) + "$"));
-
-	auto ssBuf = std::stringstream();
-	ssBuf
-		<< "User " << user.name << " placed a bet of "
-		<< amount << "$ on " << reinterpret_cast<const Hand&>(hand);
-	broadcastMsg(ssBuf.str());
+	sendMsg(socket, SS(
+		"You have successfully placed your bet: "
+			<< std::setprecision(2) << amount << "$\n" <<
+		"Balance: "
+			<< std::setprecision(2) << user.money << "$").str());
+	
+	auto successMsg = SS(
+		user.name << " placed a bet of " <<
+		std::setprecision(2) << amount) << "$";
+	
+	if (hand.cards.size() > 0)
+		successMsg << " on " << reinterpret_cast<const Hand&>(hand);
+	
+	broadcastMsg(successMsg.str());
 	
 	// Log on the server.
-	std::cout << ssBuf.str() << std::endl;
+	std::cout << successMsg.str() << std::endl;
+	
+	if (m_gameManager->everyonePlacedTheirFirstBet())
+	{
+		startHitStandPhase();
+	}
 	return 0;
+}
+
+int BlackJackServer::userRequestsToHit(
+	const int socket,
+	const std::string msgStr)
+{
+	const auto& user = m_users[socket];
+	printf("[Hit request] Socket = %d Name = %s\n", socket, user.name.c_str());
+	
+	if (!aGameIsTakingPlace())
+	{
+		sendMsg(socket,
+			"No game is currently being played, so you can't Hit.\n"
+			"- Plase type 'ready' and wait for other people to be ready.");
+		return -1;
+	}
+	
+	if (m_gameManager->getState() != GameManager::State::kHitStand)
+	{
+		sendMsg(socket, "Sorry, but it's not the hit/stand phase.");
+		return -1;
+	}
+	
+	const PlayingCards::Card* newCard;
+	int handIndex;
+	std::stringstream(msgStr) >> handIndex;
+	
+	auto ssException = std::stringstream();
+	try
+	{
+		newCard = &m_gameManager->executeHit(socket, handIndex);
+	}
+	catch (const GameManager::NotAPlayerExecption&)
+	{
+		ssException <<
+			"Sorry, but you're not participating in this game.\n"
+			"- Please wait until the game ends.";
+	}
+	catch (const GameManager::PlayerIsBustedExeption&)
+	{
+		ssException <<
+			"You can't hit anymore.\n"
+			"- Your hand is busted: " <<
+			m_gameManager->getPlayers()[socket]->getHands()[handIndex];
+	}
+	catch (const GameManager::InvalidHandIndexExecption&)
+	{
+		ssException << "You don't own such a hand.";
+	}
+	catch (const GameManager::HandIsAlreadyStandingExeption&)
+	{
+		ssException << "Hand " << handIndex << " is already standing.";
+	}
+	catch (const GameManager::PlayerHasBlackjackExeption&)
+	{
+		ssException
+			<< "You can't hit. You already have Blackjack: "
+			<< m_gameManager->getPlayers()[socket]->getHands()[handIndex];
+	}
+	
+	if (ssException.str().length() != 0)
+	{
+		sendMsg(socket, ssException.str());
+		return -1;
+	}
+	
+	const auto& player = *m_gameManager->getPlayers()[socket];
+	auto ssMsg = std::stringstream()
+		<< user.name << " Hits: " << *newCard << "\n"
+		<< "- His cards are: ";
+	player.printHands(ssMsg);
+	ssMsg << std::endl;
+
+	const auto& hand = player.getHands()[handIndex];
+	const auto handPoints = GameManager::computeHandPoints(hand);
+	if (handPoints > GameManager::blackjackPoints)
+	{
+		ssMsg << "- Busted." << std::endl;
+	}
+	else if (handPoints == GameManager::blackjackPoints)
+	{
+		ssMsg << "- BlackJack!!!" << std::endl;
+	}
+	broadcastMsg(ssMsg.str());
+	
+	return 0;
+}
+
+int BlackJackServer::userRequestsToStand(
+	const int socket,
+	const std::string msgStr)
+{
+	const auto& user = m_users[socket];
+	printf("[Hit request] Socket = %d Name = %s\n", socket, user.name.c_str());
+	
+	if (!aGameIsTakingPlace())
+	{
+		sendMsg(socket,
+			"No game is currently being played, so you can't Stand.\n"
+			"- Plase type 'ready' and wait for other people to be ready.");
+		return -1;
+	}
+	
+	if (m_gameManager->getState() != GameManager::State::kHitStand)
+	{
+		sendMsg(socket, "Sorry, but it's not the hit/stand phase.");
+		return -1;
+	}
+	
+	int handIndex;
+	std::stringstream(msgStr) >> handIndex;
+	
+	auto ssException = std::stringstream();
+	throw;
 }
 
 /*
@@ -384,9 +534,9 @@ void BlackJackServer::startGame()
 	
 	// Notify the users.
 	{
-		broadcastMsg(STR(
-		"Everybody is ready. A game of " +
-		std::to_string(nbOfPlayers) + " player(s) will now start."));
+		broadcastMsg(SS(
+			"Everybody is ready. A game of " <<
+			nbOfPlayers << " player(s) will now start.").str());
 	}
 	
 	for (auto& sockAndUser : m_users)
@@ -403,27 +553,63 @@ void BlackJackServer::startGame()
 		{
 			sendMsg(
 				sockAndUser.first,
-				STR("Soory, you don't have enought money to play. Money: " +
-					std::to_string(sockAndUser.second.money) + "$"));
+				SS("Soory, you don't have enought money to play. Money: " <<
+				std::setprecision(2) << sockAndUser.second.money << "$").str());
 			m_gameManager->removePlayer(sockAndUser.first);
 		}
 	}
-	const auto playerSockets = m_gameManager->getPlayersIds();
 	
 	broadcastMsg(STR(
 		"The game has successfully started with a total of " +
-		std::to_string(playerSockets.size()) + " player(s)."));
+		std::to_string(m_gameManager->getNbOfPlayers()) + " player(s).\n"));
 	
+	startBettingPhase();
+}
+
+void BlackJackServer::startBettingPhase()
+{
 	m_gameManager->setState(GameManager::State::kBet);
+	
+	const auto playerSockets = m_gameManager->getPlayersIds();
 	broadcastMsg("Betting phase. Please make your bets.", playerSockets);
 	
 	for (const auto& socket : playerSockets)
 	{
-		const auto msg = STR(
-			"Current money: " + std::to_string(m_users[socket].money) + ". "
-			"Make a bet by typing something like: 'bet 42.24$'");
-		sendMsg(socket, msg);
+		sendMsg(socket, SS(
+			"Current money: " << std::setprecision(2) <<
+			m_users[socket].money << "$. "
+			"Make a bet by typing something like: 'bet 42.24$'\n").str());
 	}
+}
+
+void BlackJackServer::startHitStandPhase()
+{
+	m_gameManager->setState(GameManager::State::kHitStand);
+	auto ssMsg = SS("Everyone placed their bets:\n");
+	for (const auto& socketAndPlayer : m_gameManager->getPlayers())
+	{
+		const auto bet = socketAndPlayer.second->getHands()[0].bet.amount;
+		ssMsg << "- " << m_users[socketAndPlayer.first].name << ": " <<
+		std::setprecision(2) << bet << "$\n";
+	}
+	
+	ssMsg << "\nDealing cards.\n";
+	m_gameManager->dealCardsToEveryone();
+	
+	for (const auto& socketAndPlayer : m_gameManager->getPlayers())
+	{
+		const auto hand = socketAndPlayer.second->getHands()[0];
+		ssMsg
+			<< m_users[socketAndPlayer.first].name << ": {" << hand << "}"
+			<< std::endl;
+	}
+	
+	ssMsg
+		<< "Dealer's first card: " << m_gameManager->getDealersHand().cards[0]
+		<< std::endl;
+	
+	ssMsg << "Please type Hit (h), or Stand (s)" << std::endl;
+	broadcastMsg(ssMsg.str());
 }
 
 /*

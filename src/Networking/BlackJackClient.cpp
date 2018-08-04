@@ -67,6 +67,7 @@ bool BlackJackClient::parseUserInput(const std::string userInput)
 	else if (parseUserInputChangeName(userInput)) {}
 	else if (parseUserInputSetToReady(userInput)) {}
 	else if (parseUserInputPlaceBet(userInput)) {}
+	else if (parseUserInputHit(userInput)) {}
 	else
 	{
 		fprintf(stderr, "%s: Invalid command\n", userInput.c_str());
@@ -76,7 +77,7 @@ bool BlackJackClient::parseUserInput(const std::string userInput)
 	return true;
 }
 
-bool BlackJackClient::parseUserInputSendMsg(std::string userInput)
+bool BlackJackClient::parseUserInputSendMsg(const std::string userInput)
 {
 	std::smatch regexMatch;
 	
@@ -108,7 +109,7 @@ bool BlackJackClient::parseUserInputChangeName(const std::string userInput)
 	return true;
 }
 
-bool BlackJackClient::parseUserInputSetToReady(std::string userInput)
+bool BlackJackClient::parseUserInputSetToReady(const std::string userInput)
 {
 	std::smatch regexMatch;
 	
@@ -124,7 +125,7 @@ bool BlackJackClient::parseUserInputSetToReady(std::string userInput)
 	return true;
 }
 
-bool BlackJackClient::parseUserInputPlaceBet(std::string userInput)
+bool BlackJackClient::parseUserInputPlaceBet(const std::string userInput)
 {
 	static const char* const regexDouble =
 		"(?:0|(?:[1-9][0-9]*))(?:\\.[0-9]+)?";
@@ -155,6 +156,36 @@ bool BlackJackClient::parseUserInputPlaceBet(std::string userInput)
 	
 	auto ssBuf = std::stringstream();
 	ssBuf << MsgHeaders::kBetRequest << amount << " " << handIndex;
+	
+	sendStr(ssBuf.str());
+	return true;
+}
+
+bool BlackJackClient::parseUserInputHit(const std::string userInput)
+{
+	std::smatch regexMatch;
+	int handIndex = 0;
+	
+	const auto itMatches = std::regex_search(
+		userInput,
+		regexMatch,
+		std::regex(STR("^([Hh]it|[Hh])$")));
+	
+	if (!itMatches)
+	{
+		const auto itMatches = std::regex_search(
+			userInput,
+			regexMatch,
+			std::regex(STR("^(?:[Hh]it|[Hh]) on ([0-9])$")));
+		
+		if (!itMatches)
+			return false;
+		
+		handIndex = std::stoi(regexMatch[1]);
+	}
+	
+	auto ssBuf = std::stringstream();
+	ssBuf << MsgHeaders::kHitRequest << handIndex;
 	
 	sendStr(ssBuf.str());
 	return true;
