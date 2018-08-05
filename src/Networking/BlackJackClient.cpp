@@ -32,7 +32,8 @@ void BlackJackClient::listenToServerActionsThread()
 {
 	while (true)
 	{
-		const auto receiveResult = m_client->receiveData(m_client->getSocket());
+		const auto receiveResult =
+			m_client->getSocketIOTools().receiveData(m_client->getSocket());
 		if (receiveResult == 0 || receiveResult == -1)
 		{
 			for (const auto& eventHandler : m_onDisconnectEventHandlers)
@@ -42,8 +43,8 @@ void BlackJackClient::listenToServerActionsThread()
 		}
 		
 		parseServerInput(
-			m_client->getReceiveBuf(),
-			m_client->getReceiveBufLen());
+			m_client->getSocketIOTools().getReceiveBuf(),
+			m_client->getSocketIOTools().getReceiveBufLen());
 	}
 }
 
@@ -226,7 +227,10 @@ void BlackJackClient::sendStr(const std::string str)
 {
 	try
 	{
-		m_client->sendData(m_client->getSocket(), str.c_str(), str.length());
+		m_client->getSocketIOTools().sendData(
+			m_client->getSocket(),
+			str.c_str(),
+			str.length());
 	}
 	catch (const SocketTools::Exceptions::SocketException& e)
 	{

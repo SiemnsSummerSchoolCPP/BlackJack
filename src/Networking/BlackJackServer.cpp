@@ -745,7 +745,10 @@ void BlackJackServer::sendStr(const int socket, const std::string str)
 {
 	try
 	{
-		m_server->sendData(socket, str.c_str(), str.length());
+		m_server->getSocketIOTools().sendData(
+			socket,
+			str.c_str(),
+			str.length());
 	}
 	catch (const SocketTools::Exceptions::SocketException& e)
 	{

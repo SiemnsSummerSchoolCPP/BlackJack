@@ -12,6 +12,11 @@
 using namespace SocketTools;
 using namespace Exceptions;
 
+SocketIO& Client::getSocketIOTools()
+{
+	return m_socketIOTools;
+}
+
 int Client::getSocket() const
 {
 	return m_socket;

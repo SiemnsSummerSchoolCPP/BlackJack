@@ -27,6 +27,11 @@ Server::Server(
 ** Getters
 */
 
+SocketIO& Server::getSocketIOTools()
+{
+	return m_socketIOTools;
+}
+
 const int* Server::getClients() const
 {
 	return m_clientSockets;
@@ -231,7 +236,7 @@ void Server::parseServerActivity()
 void Server::parseClientActivity(const size_t clientSocketIndex)
 {
 	const auto clientSock = m_clientSockets[clientSocketIndex];
-	const auto receiveResult = receiveData(clientSock);
+	const auto receiveResult = m_socketIOTools.receiveData(clientSock);
 	if (receiveResult > 0)
 	{
 		for (const auto& eventHandlerF : m_newMsgEventHandlers)
@@ -239,8 +244,8 @@ void Server::parseClientActivity(const size_t clientSocketIndex)
 			eventHandlerF(
 				*this,
 				 clientSock,
-				 getReceiveBuf(),
-				 getReceiveBufLen());
+				 m_socketIOTools.getReceiveBuf(),
+				 m_socketIOTools.getReceiveBufLen());
 		}
 	}
 	else if (receiveResult == 0)

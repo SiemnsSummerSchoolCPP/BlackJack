@@ -4,16 +4,6 @@
 
 using namespace SocketTools;
 
-unsigned char* SocketIO::getReceiveBuf() const
-{
-	return m_receiveBuf;
-}
-
-size_t SocketIO::getReceiveBufLen() const
-{
-	return m_receiveBufLen;
-}
-
 int SocketIO::sendData(
 	const int socket,
 	const void* const data,
@@ -26,6 +16,16 @@ int SocketIO::sendData(
 		return -1;
 	
 	return 0;
+}
+
+unsigned char* SocketIO::getReceiveBuf() const
+{
+	return m_receiveBuf;
+}
+
+size_t SocketIO::getReceiveBufLen() const
+{
+	return m_receiveBufLen;
 }
 
 int SocketIO::receiveData(const int socket)

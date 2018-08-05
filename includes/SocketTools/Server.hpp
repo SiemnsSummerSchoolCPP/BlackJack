@@ -8,7 +8,7 @@
 
 namespace SocketTools
 {
-	class Server : public SocketIO
+	class Server
 	{
 	public:
 		// Event handlers' types.
@@ -21,6 +21,7 @@ namespace SocketTools
 		Server(size_t maxNbOfClients = 4, size_t maxPendingConnections = 5);
 		
 		// Getters.
+		SocketIO& getSocketIOTools();
 		const int* getClients() const;
 		size_t getMaxNbOfClients() const;
 		std::vector<ClientConnectedEvent>& getNewClientEventHandlers();
@@ -39,6 +40,7 @@ namespace SocketTools
 		const size_t m_maxNbOfClients;
 		const size_t m_maxPendingConnections;
 	
+		SocketIO m_socketIOTools;
 		int m_masterSocket = 0;
 		int* m_clientSockets = nullptr;
 		fd_set m_socketDescriptorsSet;
